@@ -4,3 +4,4 @@ shapely
 matplotlib
 folium
 mapclassify==2.8.1
+torch

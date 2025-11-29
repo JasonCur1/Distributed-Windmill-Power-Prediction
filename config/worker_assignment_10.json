@@ -1,0 +1,102 @@
+{
+  "num_workers": 10,
+  "workers": [
+    {
+      "rank": 0,
+      "states": [
+        "TX"
+      ],
+      "num_samples": 1594320
+    },
+    {
+      "rank": 1,
+      "states": [
+        "MN"
+      ],
+      "num_samples": 1051200
+    },
+    {
+      "rank": 2,
+      "states": [
+        "IA"
+      ],
+      "num_samples": 937320
+    },
+    {
+      "rank": 3,
+      "states": [
+        "CA",
+        "WV",
+        "MD"
+      ],
+      "num_samples": 937320
+    },
+    {
+      "rank": 4,
+      "states": [
+        "OK",
+        "WY",
+        "IN",
+        "AZ",
+        "UT"
+      ],
+      "num_samples": 937320
+    },
+    {
+      "rank": 5,
+      "states": [
+        "IL",
+        "NY",
+        "OH",
+        "WI",
+        "NJ"
+      ],
+      "num_samples": 911040
+    },
+    {
+      "rank": 6,
+      "states": [
+        "OR",
+        "PA",
+        "SD",
+        "MO",
+        "NH"
+      ],
+      "num_samples": 928560
+    },
+    {
+      "rank": 7,
+      "states": [
+        "KS",
+        "NE",
+        "NM",
+        "MT",
+        "NV"
+      ],
+      "num_samples": 911040
+    },
+    {
+      "rank": 8,
+      "states": [
+        "ND",
+        "MI",
+        "MA",
+        "ME",
+        "DE",
+        "CT"
+      ],
+      "num_samples": 911040
+    },
+    {
+      "rank": 9,
+      "states": [
+        "ID",
+        "CO",
+        "WA",
+        "RI",
+        "VT"
+      ],
+      "num_samples": 919800
+    }
+  ]
+}
