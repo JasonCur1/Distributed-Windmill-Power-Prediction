@@ -216,3 +216,5 @@ __marimo__/
 .streamlit/secrets.toml
 src/uswtdb-to-pluswind/pluswind-plant-list-20221213.csv
 src/uswtdb-to-pluswind/uswtdb_v5.csv
+data/raw_weather_data/*.csv
+data/*.csv
