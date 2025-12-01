@@ -1,0 +1,45 @@
+# Hyperparameters
+
+# Dataset
+dataset:
+  path: "data/wind_turbine_data.csv"
+  num_states: 37
+  num_counties: 395
+  total_samples: 10038960
+
+# Model architecture
+model:
+  state_embedding_dim: 16
+  county_embedding_dim: 32
+  hidden_dims: [64, 128, 256, 128, 64]
+  dropout: 0.3
+
+# Training
+training:
+  num_epochs: 50
+  batch_size: 256  # per worker
+  learning_rate: 0.001
+  optimizer: "adam"
+  loss_function: "mse"
+
+# Distributed
+distributed:
+  num_workers: 10
+  backend: "gloo"  # or "nccl" for GPU
+  master_port: 29500
+
+# DataLoader
+dataloader:
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+# Checkpointing
+checkpointing:
+  save_every: 10  # epochs
+  checkpoint_dir: "outputs/models"
+
+# Logging
+logging:
+  log_dir: "outputs/logs"
+  print_every: 100  # batches

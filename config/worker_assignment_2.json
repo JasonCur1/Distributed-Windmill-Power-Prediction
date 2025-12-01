@@ -1,0 +1,54 @@
+{
+  "num_workers": 2,
+  "workers": [
+    {
+      "rank": 0,
+      "states": [
+        "TX",
+        "CA",
+        "IL",
+        "KS",
+        "CO",
+        "MI",
+        "PA",
+        "WY",
+        "MA",
+        "SD",
+        "RI",
+        "ME",
+        "MO",
+        "WV",
+        "NH",
+        "UT",
+        "DE",
+        "NV"
+      ],
+      "num_samples": 5019480
+    },
+    {
+      "rank": 1,
+      "states": [
+        "MN",
+        "IA",
+        "OK",
+        "OR",
+        "ND",
+        "ID",
+        "NE",
+        "NY",
+        "WA",
+        "NM",
+        "OH",
+        "IN",
+        "MT",
+        "WI",
+        "AZ",
+        "VT",
+        "MD",
+        "NJ",
+        "CT"
+      ],
+      "num_samples": 5019480
+    }
+  ]
+}
