@@ -68,6 +68,28 @@ def train_one_epoch(model, dataloader, optimizer, criterion, epoch, rank, world_
 
     return avg_loss
 
+def validate(model, val_loader, criterion, rank):
+    """Validate model on validation set"""
+    model.eval()
+    total_loss = 0
+    num_batches = 0
+
+    with torch.no_grad():
+        for inputs, targets in val_loader:
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            total_loss += loss.item()
+            num_batches += 1
+
+    avg_loss = total_loss / num_batches
+
+    # Aggregate across workers
+    loss_tensor = torch.tensor([avg_loss], dtype=torch.float32)
+    dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
+    global_val_loss = loss_tensor.item() / dist.get_world_size()
+
+    return global_val_loss
+
 def main():
     rank, world_size = setup_distributed()
 
@@ -91,6 +113,16 @@ def main():
     train_loader = get_distributed_dataloader(
         rank=rank,
         world_size=world_size,
+        data_path='data/wind_turbine_train.csv',
+        batch_size=BATCH_SIZE,
+        num_workers_dataloader=4
+    )
+
+    print(f"\n[Rank {rank}] Loading validation data...")
+    val_loader = get_distributed_dataloader(
+        rank=rank,
+        world_size=world_size,
+        data_path='data/wind_turbine_val.csv',
         batch_size=BATCH_SIZE,
         num_workers_dataloader=4
     )
@@ -114,6 +146,8 @@ def main():
         os.makedirs('outputs/models', exist_ok=True)
         os.makedirs('outputs/logs', exist_ok=True)
 
+    best_val_loss = float('inf')
+
     dist.barrier() # sync barrier
 
     if rank == 0:
@@ -128,20 +162,41 @@ def main():
             print(f"EPOCH {epoch + 1}/{NUM_EPOCHS}")
             print(f"{'='*60}")
 
-        epoch_loss = train_one_epoch(
+        # Train for one epoch
+        train_loss = train_one_epoch(
             model, train_loader, optimizer, criterion, epoch, rank, world_size
         )
 
-        # Save checkpoint (rank 0 only)
-        if rank == 0 and (epoch + 1) % 10 == 0:
-            checkpoint_path = f'outputs/models/checkpoint_epoch_{epoch + 1}.pt'
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.module.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': epoch_loss,
-            }, checkpoint_path)
-            print(f"  Checkpoint saved to {checkpoint_path}")
+        # Validate
+        val_loss = validate(model, val_loader, criterion, rank, world_size)
+
+        if rank == 0:
+            print(f"  Validation loss: {val_loss:.6f}")
+
+            # Save best model based on validation loss
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_model_path = 'outputs/models/best_model.pt'
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.module.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'train_loss': train_loss,
+                    'val_loss': val_loss,
+                }, best_model_path)
+                print(f"  New best model saved! (val_loss: {val_loss:.6f})")
+
+            # Save periodic checkpoint
+            if (epoch + 1) % 10 == 0:
+                checkpoint_path = f'outputs/models/checkpoint_epoch_{epoch + 1}.pt'
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.module.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'train_loss': train_loss,
+                    'val_loss': val_loss,
+                }, checkpoint_path)
+                print(f"  Checkpoint saved to {checkpoint_path}")
 
     # Training complete
     total_time = time.time() - start_time
@@ -152,10 +207,12 @@ def main():
         print("="*60)
         print(f"Total training time: {total_time/60:.2f} minutes")
         print(f"Average time per epoch: {total_time/NUM_EPOCHS:.2f} seconds")
+        print(f"Best validation loss: {best_val_loss:.6f}")
 
         final_model_path = 'outputs/models/final_model.pt'
         torch.save(model.module.state_dict(), final_model_path)
         print(f"Final model saved to {final_model_path}")
+        print(f"Best model saved to outputs/models/best_model.pt")
         print("="*60 + "\n")
 
     cleanup()

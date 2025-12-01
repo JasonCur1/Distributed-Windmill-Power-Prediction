@@ -57,7 +57,7 @@ def load_worker_assignment(num_workers):
         assignment = json.load(f)
     return assignment
 
-def get_distributed_dataloader(rank, world_size, batch_size=32, num_workers_dataloader=4):
+def get_distributed_dataloader(rank, world_size, data_path, batch_size=32, num_workers_dataloader=4):
     print(f"[Rank {rank}] Loading data partition...")
 
     # Load metadata
@@ -76,7 +76,7 @@ def get_distributed_dataloader(rank, world_size, batch_size=32, num_workers_data
 
     # Load full dataset
     print(f"[Rank {rank}] Reading CSV file...")
-    df = pd.read_csv('data/wind_turbine_data.csv')
+    df = pd.read_csv(data_path)
 
     # Filter to only this rank's states
     my_data = df[df['t_state'].isin(my_states)].copy()
