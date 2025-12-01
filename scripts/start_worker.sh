@@ -1,0 +1,11 @@
+#!/bin/bash
+
+RANK=$1 # rank passed as arg
+
+export MASTER_ADDR="129.82.44.125" # coordinator's ip
+export MASTER_PORT="29500" # coordinator's port
+export WORLD_SIZE="10"
+export RANK="$RANK"
+
+cd ~/cs555/term-project
+python src/train.py
