@@ -4,3 +4,9 @@
 2. bash scripts/start-tmux.sh
 3. python src/evaluate.py
 4. python src/feature_importance.py
+
+left off:
+training failed on epoch 34
+best model was saved
+
+perform testing accuracy analysis and metric analysis

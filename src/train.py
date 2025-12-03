@@ -40,22 +40,23 @@ def train_one_epoch(model, dataloader, optimizer, criterion, epoch, rank, world_
 
     start_time = time.time()
 
-    for batch_index, (inputs, targets) in enumerate(dataloader):
-        optimizer.zero_grad()
+    with model.join(): # use join() to handle uneven batch counts
+        for batch_index, (inputs, targets) in enumerate(dataloader):
+            optimizer.zero_grad()
 
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
 
-        loss.backward() # Gradients auto synced here
-        optimizer.step()
+            loss.backward() # Gradients auto synced here
+            optimizer.step()
 
-        total_loss += loss.item()
-        num_batches += 1
+            total_loss += loss.item()
+            num_batches += 1
 
-        if rank == 0 and batch_index % 100 == 0: # for now only coordinator prints
-            print(f"  Batch {batch_index}/{len(dataloader)}, Loss: {loss.item():.6f}")
+            if rank == 0 and batch_index % 100 == 0: # for now only coordinator prints
+                print(f"  Batch {batch_index}/{len(dataloader)}, Loss: {loss.item():.6f}")
 
-    avg_loss = total_loss / len(dataloader)
+    avg_loss = total_loss / max(1, len(dataloader))
     epoch_time = time.time() - start_time
 
     loss_tensor = torch.tensor([avg_loss], dtype=torch.float32)
@@ -68,25 +69,27 @@ def train_one_epoch(model, dataloader, optimizer, criterion, epoch, rank, world_
 
     return avg_loss
 
-def validate(model, val_loader, criterion, rank):
+def validate(model, val_loader, criterion, rank, world_size):
     """Validate model on validation set"""
     model.eval()
     total_loss = 0
     num_batches = 0
 
+    inference_model = model.module if hasattr(model, 'module') else model
+
     with torch.no_grad():
         for inputs, targets in val_loader:
-            outputs = model(inputs)
+            outputs = inference_model(inputs) # Use unwrapped model
             loss = criterion(outputs, targets)
             total_loss += loss.item()
             num_batches += 1
 
-    avg_loss = total_loss / num_batches
+    avg_loss = total_loss / max(1, num_batches)
 
     # Aggregate across workers
     loss_tensor = torch.tensor([avg_loss], dtype=torch.float32)
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
-    global_val_loss = loss_tensor.item() / dist.get_world_size()
+    global_val_loss = loss_tensor.item() / world_size
 
     return global_val_loss
 
@@ -98,125 +101,95 @@ def main():
     NUM_EPOCHS = 50
     LEARNING_RATE = 0.001
 
+    # Check for resumption
+    start_epoch = 0
+    resume_path = 'outputs/models/checkpoint_epoch_30.pt' # TODO: this can change depending on where we resume from
+
+    if rank == 0 and not os.path.exists(resume_path):
+        print("No checkpoint found, starting from scratch.")
+        resume_path = None
+
     if rank == 0:
         print("\n" + "="*60)
         print("DISTRIBUTED WIND POWER PREDICTION TRAINING")
         print("="*60)
         print(f"Workers: {world_size}")
-        print(f"Batch size per worker: {BATCH_SIZE}")
-        print(f"Global batch size: {BATCH_SIZE * world_size}")
         print(f"Epochs: {NUM_EPOCHS}")
-        print(f"Learning rate: {LEARNING_RATE}")
+        if resume_path:
+            print(f"RESUMING from {resume_path}")
         print("="*60 + "\n")
 
+    # Load Data
     print(f"\n[Rank {rank}] Loading data...")
-    train_loader = get_distributed_dataloader(
-        rank=rank,
-        world_size=world_size,
-        data_path='data/wind_turbine_train.csv',
-        batch_size=BATCH_SIZE,
-        num_workers_dataloader=4
-    )
+    train_loader = get_distributed_dataloader(rank, world_size, 'data/wind_turbine_train.csv', BATCH_SIZE)
+    val_loader = get_distributed_dataloader(rank, world_size, 'data/wind_turbine_val.csv', BATCH_SIZE)
 
-    print(f"\n[Rank {rank}] Loading validation data...")
-    val_loader = get_distributed_dataloader(
-        rank=rank,
-        world_size=world_size,
-        data_path='data/wind_turbine_val.csv',
-        batch_size=BATCH_SIZE,
-        num_workers_dataloader=4
-    )
-
-    print(f"[Rank {rank}] Creating model...")
+    # Create Model
     model = WindPowerModel()
-    model = DDP(model) # DDP handles all inter machine comunication
 
+    # Load state BEFORE wrapping in DDP if resuming
+    optimizer_state = None
+    if os.path.exists('outputs/models/checkpoint_epoch_30.pt'):
+        print(f"[Rank {rank}] Loading checkpoint...")
+        checkpoint = torch.load('outputs/models/checkpoint_epoch_30.pt', map_location='cpu')
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer_state = checkpoint['optimizer_state_dict']
+        start_epoch = checkpoint['epoch'] + 1
+
+    model = DDP(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+    if optimizer_state:
+        optimizer.load_state_dict(optimizer_state)
+
     criterion = torch.nn.MSELoss()
 
     if rank == 0:
-        total_params = sum(p.numel() for p in model.parameters())
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"\nModel parameters:")
-        print(f"  Total: {total_params:,}")
-        print(f"  Trainable: {trainable_params:,}")
-        print()
-
-    if rank == 0:
         os.makedirs('outputs/models', exist_ok=True)
-        os.makedirs('outputs/logs', exist_ok=True)
 
     best_val_loss = float('inf')
 
-    dist.barrier() # sync barrier
+    # Sync before starting
+    dist.barrier()
 
-    if rank == 0:
-        print("Starting training...\n")
-
-    # Training loop
-    start_time = time.time()
-
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(start_epoch, NUM_EPOCHS):
         if rank == 0:
             print(f"\n{'='*60}")
             print(f"EPOCH {epoch + 1}/{NUM_EPOCHS}")
             print(f"{'='*60}")
 
-        # Train for one epoch
-        train_loss = train_one_epoch(
-            model, train_loader, optimizer, criterion, epoch, rank, world_size
-        )
-
-        # Validate
+        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, epoch, rank, world_size)
         val_loss = validate(model, val_loader, criterion, rank, world_size)
 
         if rank == 0:
             print(f"  Validation loss: {val_loss:.6f}")
 
-            # Save best model based on validation loss
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                best_model_path = 'outputs/models/best_model.pt'
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.module.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'train_loss': train_loss,
                     'val_loss': val_loss,
-                }, best_model_path)
-                print(f"  New best model saved! (val_loss: {val_loss:.6f})")
+                }, 'outputs/models/best_model.pt')
+                print(f"  New best model saved!")
 
-            # Save periodic checkpoint
             if (epoch + 1) % 10 == 0:
-                checkpoint_path = f'outputs/models/checkpoint_epoch_{epoch + 1}.pt'
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.module.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'train_loss': train_loss,
                     'val_loss': val_loss,
-                }, checkpoint_path)
-                print(f"  Checkpoint saved to {checkpoint_path}")
-
-    # Training complete
-    total_time = time.time() - start_time
+                }, f'outputs/models/checkpoint_epoch_{epoch + 1}.pt')
+                print(f"  Checkpoint saved.")
 
     if rank == 0:
-        print("\n" + "="*60)
-        print("TRAINING COMPLETE")
-        print("="*60)
-        print(f"Total training time: {total_time/60:.2f} minutes")
-        print(f"Average time per epoch: {total_time/NUM_EPOCHS:.2f} seconds")
-        print(f"Best validation loss: {best_val_loss:.6f}")
-
-        final_model_path = 'outputs/models/final_model.pt'
-        torch.save(model.module.state_dict(), final_model_path)
-        print(f"Final model saved to {final_model_path}")
-        print(f"Best model saved to outputs/models/best_model.pt")
-        print("="*60 + "\n")
+        print("\nTRAINING COMPLETE")
+        torch.save(model.module.state_dict(), 'outputs/models/final_model.pt')
 
     cleanup()
-
 
 if __name__ == "__main__":
     main()

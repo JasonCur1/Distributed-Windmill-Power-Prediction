@@ -1,0 +1,162 @@
+{
+  "num_workers": 20,
+  "workers": [
+    {
+      "rank": 0,
+      "states": [
+        "TX"
+      ],
+      "num_samples": 1594320
+    },
+    {
+      "rank": 1,
+      "states": [
+        "MN"
+      ],
+      "num_samples": 1051200
+    },
+    {
+      "rank": 2,
+      "states": [
+        "IA"
+      ],
+      "num_samples": 937320
+    },
+    {
+      "rank": 3,
+      "states": [
+        "CA"
+      ],
+      "num_samples": 832200
+    },
+    {
+      "rank": 4,
+      "states": [
+        "OK"
+      ],
+      "num_samples": 464280
+    },
+    {
+      "rank": 5,
+      "states": [
+        "IL"
+      ],
+      "num_samples": 385440
+    },
+    {
+      "rank": 6,
+      "states": [
+        "OR"
+      ],
+      "num_samples": 367920
+    },
+    {
+      "rank": 7,
+      "states": [
+        "KS"
+      ],
+      "num_samples": 341640
+    },
+    {
+      "rank": 8,
+      "states": [
+        "ND",
+        "NV"
+      ],
+      "num_samples": 332880
+    },
+    {
+      "rank": 9,
+      "states": [
+        "ID",
+        "NH",
+        "CT"
+      ],
+      "num_samples": 332880
+    },
+    {
+      "rank": 10,
+      "states": [
+        "CO",
+        "AZ",
+        "NJ",
+        "DE"
+      ],
+      "num_samples": 324120
+    },
+    {
+      "rank": 11,
+      "states": [
+        "MI",
+        "VT",
+        "MD"
+      ],
+      "num_samples": 332880
+    },
+    {
+      "rank": 12,
+      "states": [
+        "NE",
+        "MO"
+      ],
+      "num_samples": 332880
+    },
+    {
+      "rank": 13,
+      "states": [
+        "PA",
+        "WI"
+      ],
+      "num_samples": 332880
+    },
+    {
+      "rank": 14,
+      "states": [
+        "NY",
+        "WV",
+        "UT"
+      ],
+      "num_samples": 332880
+    },
+    {
+      "rank": 15,
+      "states": [
+        "WY",
+        "MT"
+      ],
+      "num_samples": 359160
+    },
+    {
+      "rank": 16,
+      "states": [
+        "WA",
+        "ME"
+      ],
+      "num_samples": 341640
+    },
+    {
+      "rank": 17,
+      "states": [
+        "NM",
+        "RI"
+      ],
+      "num_samples": 341640
+    },
+    {
+      "rank": 18,
+      "states": [
+        "MA",
+        "OH"
+      ],
+      "num_samples": 359160
+    },
+    {
+      "rank": 19,
+      "states": [
+        "SD",
+        "IN"
+      ],
+      "num_samples": 341640
+    }
+  ]
+}

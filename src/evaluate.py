@@ -38,7 +38,7 @@ def evaluate_model(model, dataloader, device='cpu'):
     print("Running inference on test set...")
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(dataloader):
-            # Move to device if using GPU
+
             for key in inputs:
                 inputs[key] = inputs[key].to(device)
             targets = targets.to(device)
@@ -57,19 +57,27 @@ def evaluate_model(model, dataloader, device='cpu'):
 
 def compute_metrics(predictions, targets):
     """Compute evaluation metrics"""
+    mse_val = mean_squared_error(targets, predictions)
+    rmse_val = np.sqrt(mse_val)
+    mae_val = mean_absolute_error(targets, predictions)
+    r2_val = r2_score(targets, predictions)
+
+    # MAPE calculation: Avoid division by zero issues if possible, though +1e-8 helps
+    mape_val = np.mean(np.abs((targets - predictions) / (targets + 1e-8))) * 100
+
     metrics = {
-        'mse': mean_squared_error(targets, predictions),
-        'rmse': np.sqrt(mean_squared_error(targets, predictions)),
-        'mae': mean_absolute_error(targets, predictions),
-        'r2': r2_score(targets, predictions),
-        'mape': np.mean(np.abs((targets - predictions) / (targets + 1e-8))) * 100,  # Mean Absolute Percentage Error
+        'mse': float(mse_val),
+        'rmse': float(rmse_val),
+        'mae': float(mae_val),
+        'r2': float(r2_val),
+        'mape': float(mape_val),
     }
 
     # Additional statistics
     errors = predictions - targets
-    metrics['mean_error'] = np.mean(errors)
-    metrics['std_error'] = np.std(errors)
-    metrics['max_error'] = np.max(np.abs(errors))
+    metrics['mean_error'] = float(np.mean(errors))
+    metrics['std_error'] = float(np.std(errors))
+    metrics['max_error'] = float(np.max(np.abs(errors)))
 
     return metrics
 
@@ -220,7 +228,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Evaluate trained wind power model')
-    parser.add_argument('--model_path', type=str, default='outputs/models/final_model.pt',
+    parser.add_argument('--model_path', type=str, default='outputs/models/best_model.pt',
                         help='Path to trained model checkpoint')
     parser.add_argument('--test_data', type=str, default='data/wind_turbine_test.csv',
                         help='Path to test dataset')
@@ -238,7 +246,17 @@ def main():
     # Load model
     print(f"Loading model from {args.model_path}...")
     model = WindPowerModel()
-    model.load_state_dict(torch.load(args.model_path, map_location=args.device))
+
+    checkpoint = torch.load(args.model_path, map_location=args.device)
+
+    # Check if the checkpoint is a wrapper dictionary or just weights
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        print("  Detected checkpoint dictionary. Loading 'model_state_dict'...")
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        print("  Detected direct state dict. Loading directly...")
+        model.load_state_dict(checkpoint)
+
     model.eval()
     print("Model loaded successfully\n")
 

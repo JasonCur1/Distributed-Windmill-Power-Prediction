@@ -21,21 +21,29 @@ class WindTurbineDataset(Dataset):
         state_id = self.state_to_id[row['t_state']]
         county_id = self.county_to_id[row['t_county']]
 
-        # Convert timestamp to Unix timestamp (seconds since epoch)
-        # Format: 1970-01-01 00:00:02.021010100
         if isinstance(row['timestamp'], str):
             dt = pd.to_datetime(row['timestamp'])
-            timestamp_unix = dt.timestamp()
         elif isinstance(row['timestamp'], pd.Timestamp):
-            timestamp_unix = row['timestamp'].timestamp()
+            dt = row['timestamp']
         else:
-            timestamp_unix = float(row['timestamp']) # use as is if already numeric
+            dt = pd.to_datetime(row['timestamp'], unit='s')
+
+        hour = dt.hour
+        month = dt.month
+
+        hour_sin = np.sin(2 * np.pi * hour / 24)
+        hour_cos = np.cos(2 * np.pi * hour / 24)
+        month_sin = np.sin(2 * np.pi * month / 12)
+        month_cos = np.cos(2 * np.pi * month / 12)
 
         continuous_features = torch.tensor([
             row['xlong'],
             row['ylat'],
             row['wind_speed'],
-            timestamp_unix
+            hour_sin,
+            hour_cos,
+            month_sin,
+            month_cos
         ], dtype=torch.float32)
 
         target = torch.tensor(row['capacity_factor'], dtype=torch.float32)

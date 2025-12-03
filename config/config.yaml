@@ -12,13 +12,13 @@ model:
   state_embedding_dim: 16
   county_embedding_dim: 32
   hidden_dims: [64, 128, 256, 128, 64]
-  dropout: 0.3
+  dropout: 0.1
 
 # Training
 training:
   num_epochs: 50
-  batch_size: 256  # per worker
-  learning_rate: 0.001
+  batch_size: 128  # per worker
+  learning_rate: 0.0001
   optimizer: "adam"
   loss_function: "mse"
 

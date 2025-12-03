@@ -15,7 +15,7 @@
 # list your hosts here, e.g., HOSTS=("carrot" "broccoli")
 # visit https://www.cs.colostate.edu/machinestats/ for a list of machines you can use
 # if you see the same hostname in multiple tmux windows, it is likely that one your hosts is down
-HOSTS=("venus" "mackerel" "marlin" "perch" "pollock" "sardine" "shark" "sole" "swordfish" "tarpon")
+HOSTS=("venus" "mackerel" "marlin" "perch" "pollock" "sardine" "shark" "sole" "swordfish" "tarpon") # "turbot" "tuna" "herring" "wahoo" "grouper" "barracuda" "blowfish" "bonito" "brill" "bullhead"
 
 # path to your project directory
 DIR="~/cs555/term-project"
