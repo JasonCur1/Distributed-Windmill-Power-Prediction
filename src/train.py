@@ -10,6 +10,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import os
 import time
 from datetime import datetime
+from sklearn.metrics import r2_score
 
 from model import WindPowerModel
 from data_loader import get_distributed_dataloader
@@ -70,28 +71,47 @@ def train_one_epoch(model, dataloader, optimizer, criterion, epoch, rank, world_
     return avg_loss
 
 def validate(model, val_loader, criterion, rank, world_size):
-    """Validate model on validation set"""
+    """Validate model on validation set and return advanced metrics"""
     model.eval()
     total_loss = 0
-    num_batches = 0
+    all_preds = []
+    all_targets = []
 
     inference_model = model.module if hasattr(model, 'module') else model
 
     with torch.no_grad():
         for inputs, targets in val_loader:
-            outputs = inference_model(inputs) # Use unwrapped model
+            outputs = inference_model(inputs)
             loss = criterion(outputs, targets)
             total_loss += loss.item()
-            num_batches += 1
 
-    avg_loss = total_loss / max(1, num_batches)
+            all_preds.append(outputs.cpu())
+            all_targets.append(targets.cpu())
 
-    # Aggregate across workers
+    # Concatenate all batches
+    all_preds = torch.cat(all_preds).numpy()
+    all_targets = torch.cat(all_targets).numpy()
+
+    avg_loss = total_loss / max(1, len(val_loader))
+
+    # Calculate R2 (Coefficient of Determination)
+    val_r2 = r2_score(all_targets, all_preds)
+
+    pred_std = all_preds.std()
+    target_std = all_targets.std()
+
     loss_tensor = torch.tensor([avg_loss], dtype=torch.float32)
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
     global_val_loss = loss_tensor.item() / world_size
 
-    return global_val_loss
+    metrics = {
+        'val_loss': global_val_loss,
+        'r2': val_r2,
+        'pred_std': pred_std,
+        'target_std': target_std
+    }
+
+    return metrics
 
 def main():
     rank, world_size = setup_distributed()
@@ -163,13 +183,22 @@ def main():
             print(f"{'='*60}")
 
         train_loss = train_one_epoch(model, train_loader, optimizer, criterion, epoch, rank, world_size)
-        val_loss = validate(model, val_loader, criterion, rank, world_size)
+
+        val_metrics = validate(model, val_loader, criterion, rank, world_size)
+        val_loss = val_metrics['val_loss']
+
+        current_lr = optimizer.param_groups[0]['lr']
 
         scheduler.step(val_loss)
 
         if rank == 0:
-            print(f"  Validation loss: {val_loss:.6f}")
+            print(f"  Train Loss: {train_loss:.6f}")
+            print(f"  Val Loss:   {val_loss:.6f}")
+            print(f"  Val R2:     {val_metrics['r2']:.4f}")
+            print(f"  Pred Std:   {val_metrics['pred_std']:.4f} (Target Std: {val_metrics['target_std']:.4f})")
+            print(f"  Current LR: {current_lr:.6f}")
 
+            # Save if validation loss improves
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 torch.save({
