@@ -12,6 +12,12 @@ class WindTurbineDataset(Dataset):
         self.state_to_id = state_to_id
         self.county_to_id = county_to_id
 
+        for col in ['t_cap', 't_hh', 't_rd']:
+            if col in self.df.columns:
+                self.df[col] = self.df[col].fillna(self.df[col].mean())
+            else:
+                self.df[col] = 0.0
+
     def __len__(self):
         return len(self.df)
 
@@ -43,7 +49,10 @@ class WindTurbineDataset(Dataset):
             hour_sin,
             hour_cos,
             month_sin,
-            month_cos
+            month_cos,
+            row['t_cap'], # Turbine Capacity
+            row['t_hh'],  # Hub Height
+            row['t_rd']   # Rotor Diameter
         ], dtype=torch.float32)
 
         target = torch.tensor(row['capacity_factor'], dtype=torch.float32)
@@ -68,12 +77,10 @@ def load_worker_assignment(num_workers):
 def get_distributed_dataloader(rank, world_size, data_path, batch_size=32, num_workers_dataloader=4):
     print(f"[Rank {rank}] Loading data partition...")
 
-    # Load metadata
     metadata = load_metadata()
     state_to_id = metadata['state_to_id']
     county_to_id = metadata['county_to_id']
 
-    # Load worker assignment
     assignment = load_worker_assignment(world_size)
     my_assignment = assignment['workers'][rank]
     my_states = my_assignment['states']
@@ -82,7 +89,6 @@ def get_distributed_dataloader(rank, world_size, data_path, batch_size=32, num_w
     print(f"[Rank {rank}] Assigned {len(my_states)} states: {my_states}")
     print(f"[Rank {rank}] Expected samples: {expected_samples:,}")
 
-    # Load full dataset
     print(f"[Rank {rank}] Reading CSV file...")
     df = pd.read_csv(data_path)
 

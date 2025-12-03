@@ -139,10 +139,14 @@ def main():
     model = DDP(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=3, verbose=True
+    )
+
     if optimizer_state:
         optimizer.load_state_dict(optimizer_state)
 
-    criterion = torch.nn.MSELoss()
+    criterion = torch.nn.HuberLoss()
 
     if rank == 0:
         os.makedirs('outputs/models', exist_ok=True)
@@ -160,6 +164,8 @@ def main():
 
         train_loss = train_one_epoch(model, train_loader, optimizer, criterion, epoch, rank, world_size)
         val_loss = validate(model, val_loader, criterion, rank, world_size)
+
+        scheduler.step(val_loss)
 
         if rank == 0:
             print(f"  Validation loss: {val_loss:.6f}")

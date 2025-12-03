@@ -14,7 +14,7 @@ class WindPowerModel(nn.Module):
         self.county_embedding = nn.Embedding(num_counties, 32)
 
         self.feature_net = nn.Sequential( # These are the continuous features
-            nn.Linear(7, 64), # xlong, ylat, wind_speed, timestamp features
+            nn.Linear(10, 64), # xlong, ylat, wind_speed, timestamp features
             nn.ReLU(),
             nn.BatchNorm1d(64),
             nn.Linear(64, 128),
